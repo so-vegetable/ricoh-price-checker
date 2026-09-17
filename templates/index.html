@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>理光相机比价</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.5rem; }
+    button { padding: .5rem 1rem; font-size: 1rem; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-top: .5rem; margin-bottom: 1.5rem; }
+    th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #eee; }
+    th { color: #666; }
+    .lowest { background: #d4edda; font-weight: 600; }
+    .error { color: #999; }
+    .muted { color: #888; font-size: .85rem; }
+    a { color: #06c; }
+  </style>
+</head>
+<body>
+  <h1>理光相机比价</h1>
+  <button id="refresh">刷新</button>
+  <span id="status" class="muted"></span>
+  <div id="table"></div>
+  <script>
+    async function load() {
+      const status = document.getElementById('status');
+      status.textContent = '抓取中…';
+      try {
+        const res = await fetch('/api/prices');
+        const items = await res.json();
+        render(items);
+        status.textContent = '更新于 ' + new Date().toLocaleTimeString();
+      } catch (e) {
+        status.textContent = '加载失败: ' + e;
+      }
+    }
+
+    function render(items) {
+      const models = [...new Set(items.map(i => i.model))];
+      let html = '';
+      for (const model of models) {
+        const rows = items.filter(i => i.model === model);
+        const ok = rows.filter(r => r.price != null);
+        const lowest = ok.length ? Math.min(...ok.map(r => r.price)) : null;
+        html += '<h2>' + model + '</h2>';
+        html += '<table><tr><th>零售商</th><th>价格</th><th>状态</th></tr>';
+        rows.sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
+        for (const r of rows) {
+          const isLow = r.price != null && r.price === lowest;
+          const price = r.price != null
+            ? '$' + r.price.toFixed(2)
+            : '<span class="error">抓取失败</span>';
+          const avail = r.available ? '现货' : (r.available === false ? '缺货/预定' : '');
+          const priceCell = isLow
+            ? '<td class="lowest">' + price + '</td>'
+            : '<td>' + price + '</td>';
+          html += '<tr><td><a href="' + r.url + '" target="_blank">'
+               + r.retailer + '</a></td>' + priceCell
+               + '<td class="muted">' + avail + '</td></tr>';
+        }
+        html += '</table>';
+      }
+      document.getElementById('table').innerHTML = html;
+    }
+
+    document.getElementById('refresh').onclick = load;
+    load();
+  </script>
+</body>
+</html>
